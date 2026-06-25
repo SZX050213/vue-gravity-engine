@@ -21,8 +21,8 @@ export async function loadConfig(projectRoot: string): Promise<GravityConfig> {
       try {
         const mod = await import(configPath);
         return { ...DEFAULT_CONFIG, ...mod.default };
-      } catch {
-        // If import fails, continue to next config file
+      } catch (err) {
+        console.warn(`[vue-gravity] Failed to load config ${fileName}:`, err);
       }
     }
   }
@@ -34,8 +34,8 @@ export async function loadConfig(projectRoot: string): Promise<GravityConfig> {
       const { readFileSync } = await import('node:fs');
       const content = readFileSync(jsonPath, 'utf-8');
       return { ...DEFAULT_CONFIG, ...JSON.parse(content) };
-    } catch {
-      // Fall through to default
+    } catch (err) {
+      console.warn('[vue-gravity] Failed to parse .gravityrc.json:', err);
     }
   }
 

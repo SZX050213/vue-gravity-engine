@@ -1,21 +1,24 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { join, relative, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GravityEngine } from './engine/scanner.js';
 import { formatTerminalReport, formatJsonReport } from './engine/reporter.js';
 import { loadConfig } from './config.js';
 import { generateSkillsMarkdown } from './skills-generator.js';
-import type { ScanReport } from './types.js';
 import pc from 'picocolors';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8'));
 
 const program = new Command();
 
 program
   .name('vue-gravity')
   .description('Vue code hallucination detector — catches AI-generated anti-patterns')
-  .version('1.0.0');
+  .version(pkg.version);
 
 program
   .command('check')
@@ -30,14 +33,6 @@ program
     const engine = new GravityEngine(config);
 
     const files = collectFiles(projectRoot, config.ignore || []);
-    const allFindings: ScanReport['findings'] = [];
-
-    for (const file of files) {
-      const content = readFileSync(file, 'utf-8');
-      const relativePath = relative(projectRoot, file);
-      allFindings.push(...engine.scan(relativePath, content));
-    }
-
     const report = engine.scanFiles(
       files.map(f => ({ path: relative(projectRoot, f), content: readFileSync(f, 'utf-8') }))
     );
@@ -94,7 +89,6 @@ function collectFiles(dir: string, ignore: string[]): string[] {
   return files;
 }
 
-const __filename = fileURLToPath(import.meta.url);
 if (process.argv[1] && (process.argv[1] === __filename || process.argv[1].endsWith('cli.ts'))) {
   program.parse();
 }

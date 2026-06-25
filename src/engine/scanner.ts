@@ -22,6 +22,8 @@ export class GravityEngine {
   scan(filePath: string, code: string): Finding[] {
     const findings: Finding[] = [];
     const lines = code.split('\n');
+    const isVue = filePath.endsWith('.vue');
+    const blockMap = isVue ? buildBlockMap(lines) : null;
 
     for (const rule of this.rules) {
       if (!rule.enabled) continue;
@@ -31,9 +33,14 @@ export class GravityEngine {
         const line = lines[lineIndex];
         if (isCommentLine(line)) continue;
 
+        // SFC block filtering: skip lines outside the rule's target block
+        if (blockMap && rule.block) {
+          const block = blockMap[lineIndex];
+          if (block !== rule.block) continue;
+        }
+
         for (const pattern of rule.patterns) {
-          const flags = pattern.flags.includes('g') ? pattern.flags : pattern.flags + 'g';
-          const regex = new RegExp(pattern.source, flags);
+          const regex = new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : pattern.flags + 'g');
           let match: RegExpExecArray | null;
 
           while ((match = regex.exec(line)) !== null) {
@@ -87,6 +94,33 @@ export class GravityEngine {
   }
 }
 
+type BlockType = 'template' | 'script' | 'style';
+
+function buildBlockMap(lines: string[]): (BlockType | null)[] {
+  const map: (BlockType | null)[] = new Array(lines.length).fill(null);
+  let current: BlockType | null = null;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (current === null) {
+      const open = line.match(/^\s*<(template|script|style)\b/);
+      if (open) {
+        current = open[1] as BlockType;
+        map[i] = current;
+        // single-line block: <script>...</script> on same line
+        if (line.includes(`</${current}>`)) current = null;
+      }
+    } else {
+      map[i] = current;
+      if (line.includes(`</${current}>`)) {
+        current = null;
+      }
+    }
+  }
+
+  return map;
+}
+
 function isCommentLine(line: string): boolean {
   const t = line.trim();
   return t.startsWith('//') || t.startsWith('/*') || t.startsWith('*') || t.startsWith('<!--');
@@ -96,10 +130,10 @@ function isInsideString(line: string, index: number): boolean {
   let inSingle = false, inDouble = false, inTemplate = false;
   for (let i = 0; i < index; i++) {
     const ch = line[i];
-    const prev = i > 0 ? line[i - 1] : '';
-    if (ch === "'" && prev !== '\\' && !inDouble && !inTemplate) inSingle = !inSingle;
-    if (ch === '"' && prev !== '\\' && !inSingle && !inTemplate) inDouble = !inDouble;
-    if (ch === '`' && prev !== '\\' && !inSingle && !inDouble) inTemplate = !inTemplate;
+    if (i > 0 && line[i - 1] === '\\') continue; // skip escaped chars
+    if (ch === "'" && !inDouble && !inTemplate) inSingle = !inSingle;
+    if (ch === '"' && !inSingle && !inTemplate) inDouble = !inDouble;
+    if (ch === '`' && !inSingle && !inDouble) inTemplate = !inTemplate;
   }
   return inSingle || inDouble || inTemplate;
 }

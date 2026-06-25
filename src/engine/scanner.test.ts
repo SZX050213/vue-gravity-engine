@@ -58,20 +58,20 @@ describe('GravityEngine', () => {
 
   it('respects config overrides — change severity', () => {
     const engine = new GravityEngine({ rules: { 'api-no-react-hooks': { severity: 'warning' } } });
-    const findings = engine.scan('App.vue', 'const [c, s] = useState(0)');
+    const findings = engine.scan('App.vue', '<script setup>\nconst [c, s] = useState(0)\n</script>');
     expect(findings[0].severity).toBe('warning');
   });
 
   it('reports correct line and column numbers', () => {
     const engine = new GravityEngine();
-    const findings = engine.scan('App.vue', 'line1\nline2\nconst x = useState(1)\nline4');
-    expect(findings[0].line).toBe(3);
+    const findings = engine.scan('App.vue', '<script setup>\nline1\nline2\nconst x = useState(1)\n</script>');
+    expect(findings[0].line).toBe(4);
     expect(findings[0].column).toBe(11);
   });
 
   it('scanFiles returns a ScanReport', () => {
     const engine = new GravityEngine();
-    const report = engine.scanFiles([{ path: 'App.vue', content: '<div className="x"></div>' }]);
+    const report = engine.scanFiles([{ path: 'App.vue', content: '<template>\n<div className="x"></div>\n</template>' }]);
     expect(report.scannedFiles).toBe(1);
     expect(report.summary.errors).toBeGreaterThanOrEqual(1);
   });
@@ -80,5 +80,35 @@ describe('GravityEngine', () => {
     const engine = new GravityEngine({ rules: { 'api-no-react-hooks': { enabled: false } } });
     const rules = engine.getRules();
     expect(rules.some(r => r.id === 'api-no-react-hooks')).toBe(false);
+  });
+
+  it('SFC block filtering — template rule only matches in template block', () => {
+    const engine = new GravityEngine();
+    // className outside <template> should not trigger
+    const code = '<script setup>\nconst className = "foo"\n</script>';
+    const findings = engine.scan('App.vue', code);
+    expect(findings.some(f => f.ruleId === 'template-no-classname')).toBe(false);
+  });
+
+  it('SFC block filtering — style rule only matches in style block', () => {
+    const engine = new GravityEngine();
+    // /deep/ in <script> string should not trigger style rule
+    const code = '<script setup>\nconst s = "/deep/ .foo"\n</script>';
+    const findings = engine.scan('App.vue', code);
+    expect(findings.some(f => f.ruleId === 'styles-no-deep-deprecated')).toBe(false);
+  });
+
+  it('SFC block filtering — script rule only matches in script block', () => {
+    const engine = new GravityEngine();
+    // useState in template text should not trigger script rule
+    const code = '<template>\n<p>useState()</p>\n</template>';
+    const findings = engine.scan('App.vue', code);
+    expect(findings.some(f => f.ruleId === 'api-no-react-hooks')).toBe(false);
+  });
+
+  it('non-vue files do not use block filtering', () => {
+    const engine = new GravityEngine();
+    const findings = engine.scan('utils.ts', 'const [c, s] = useState(0)');
+    expect(findings.some(f => f.ruleId === 'api-no-react-hooks')).toBe(true);
   });
 });

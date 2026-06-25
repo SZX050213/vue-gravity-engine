@@ -9,6 +9,8 @@ export interface GravityRule {
   message: string;
   suggestion: string;
   docsUrl?: string;
+  /** Restrict matching to a specific SFC block ('template' | 'script' | 'style'). Undefined = match everywhere. */
+  block?: 'template' | 'script' | 'style';
 }
 
 export interface Finding {

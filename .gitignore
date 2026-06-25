@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# OS
+.DS_Store
+
+# Claude Code
+.claude/
+
+# Docs (internal)
+docs/
+
+# User config (not committed)
+gravity.config.ts
+gravity.config.js
+gravity.config.mjs
+.gravityrc.json
+
+# Auth & env
+.npmrc
+.env
+.env.*
+
+# Reports
+gravity-report.*
+
+# Logs
+*.log
+npm-debug.log*
